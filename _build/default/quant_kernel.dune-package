@@ -1,0 +1,143 @@
+(lang dune 3.21)
+(name quant_kernel)
+(sections (lib .) (libexec .) (bin ../../bin) (stublibs ../stublibs))
+(files
+ (lib
+  (META
+   american_pricing.ml
+   config.ml
+   dune-package
+   libquant_kernel_stubs.a
+   market_data.ml
+   markov_chain.ml
+   memory_bridge.ml
+   monte_carlo.ml
+   neural_calibrate.ml
+   neural_sabr.ml
+   quant_kernel.a
+   quant_kernel.cma
+   quant_kernel.cmi
+   quant_kernel.cmt
+   quant_kernel.cmx
+   quant_kernel.cmxa
+   quant_kernel.ml
+   quant_kernel__.cmi
+   quant_kernel__.cmt
+   quant_kernel__.cmx
+   quant_kernel__.ml
+   quant_kernel__American_pricing.cmi
+   quant_kernel__American_pricing.cmt
+   quant_kernel__American_pricing.cmx
+   quant_kernel__Config.cmi
+   quant_kernel__Config.cmt
+   quant_kernel__Config.cmx
+   quant_kernel__Market_data.cmi
+   quant_kernel__Market_data.cmt
+   quant_kernel__Market_data.cmx
+   quant_kernel__Markov_chain.cmi
+   quant_kernel__Markov_chain.cmt
+   quant_kernel__Markov_chain.cmx
+   quant_kernel__Memory_bridge.cmi
+   quant_kernel__Memory_bridge.cmt
+   quant_kernel__Memory_bridge.cmx
+   quant_kernel__Monte_carlo.cmi
+   quant_kernel__Monte_carlo.cmt
+   quant_kernel__Monte_carlo.cmx
+   quant_kernel__Neural_calibrate.cmi
+   quant_kernel__Neural_calibrate.cmt
+   quant_kernel__Neural_calibrate.cmx
+   quant_kernel__Neural_sabr.cmi
+   quant_kernel__Neural_sabr.cmt
+   quant_kernel__Neural_sabr.cmx
+   quant_kernel__Signature_bergomi.cmi
+   quant_kernel__Signature_bergomi.cmt
+   quant_kernel__Signature_bergomi.cmx
+   quant_kernel__Slv_engine.cmi
+   quant_kernel__Slv_engine.cmt
+   quant_kernel__Slv_engine.cmx
+   quant_kernel__Stream_server.cmi
+   quant_kernel__Stream_server.cmt
+   quant_kernel__Stream_server.cmx
+   signature_bergomi.ml
+   slv_engine.ml
+   stream_server.ml))
+ (libexec (quant_kernel.cmxs))
+ (bin (quant_kernel_main))
+ (stublibs (dllquant_kernel_stubs.so)))
+(library
+ (name quant_kernel)
+ (kind normal)
+ (archives (byte quant_kernel.cma) (native quant_kernel.cmxa))
+ (plugins (byte quant_kernel.cma) (native quant_kernel.cmxs))
+ (foreign_objects
+  kernel.o
+  kernel_stubs.o
+  markov_kernel.o
+  neural_calib.o
+  sabr_kernel.o
+  signature_kernel.o)
+ (foreign_archives (archives (for all) (files libquant_kernel_stubs.a)))
+ (foreign_dll_files ../stublibs/dllquant_kernel_stubs.so)
+ (native_archives quant_kernel.a)
+ (requires ctypes ctypes-foreign lwt websocket-lwt-unix yojson unix lwt_log)
+ (main_module_name Quant_kernel)
+ (modes byte native)
+ (modules
+  (wrapped
+   (group
+    (alias
+     (obj_name quant_kernel__)
+     (visibility public)
+     (kind alias)
+     (source (path Quant_kernel__) (impl (path quant_kernel__.ml-gen))))
+    (name Quant_kernel)
+    (modules
+     (module
+      (obj_name quant_kernel__American_pricing)
+      (visibility public)
+      (source (path American_pricing) (impl (path american_pricing.ml))))
+     (module
+      (obj_name quant_kernel__Config)
+      (visibility public)
+      (source (path Config) (impl (path config.ml))))
+     (module
+      (obj_name quant_kernel__Market_data)
+      (visibility public)
+      (source (path Market_data) (impl (path market_data.ml))))
+     (module
+      (obj_name quant_kernel__Markov_chain)
+      (visibility public)
+      (source (path Markov_chain) (impl (path markov_chain.ml))))
+     (module
+      (obj_name quant_kernel__Memory_bridge)
+      (visibility public)
+      (source (path Memory_bridge) (impl (path memory_bridge.ml))))
+     (module
+      (obj_name quant_kernel__Monte_carlo)
+      (visibility public)
+      (source (path Monte_carlo) (impl (path monte_carlo.ml))))
+     (module
+      (obj_name quant_kernel__Neural_calibrate)
+      (visibility public)
+      (source (path Neural_calibrate) (impl (path neural_calibrate.ml))))
+     (module
+      (obj_name quant_kernel__Neural_sabr)
+      (visibility public)
+      (source (path Neural_sabr) (impl (path neural_sabr.ml))))
+     (module
+      (obj_name quant_kernel)
+      (visibility public)
+      (source (path Quant_kernel) (impl (path quant_kernel.ml))))
+     (module
+      (obj_name quant_kernel__Signature_bergomi)
+      (visibility public)
+      (source (path Signature_bergomi) (impl (path signature_bergomi.ml))))
+     (module
+      (obj_name quant_kernel__Slv_engine)
+      (visibility public)
+      (source (path Slv_engine) (impl (path slv_engine.ml))))
+     (module
+      (obj_name quant_kernel__Stream_server)
+      (visibility public)
+      (source (path Stream_server) (impl (path stream_server.ml))))))
+   (wrapped true))))

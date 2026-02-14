@@ -1,0 +1,6 @@
+description = ""
+requires = "ctypes ctypes-foreign lwt lwt_log unix websocket-lwt-unix yojson"
+archive(byte) = "quant_kernel.cma"
+archive(native) = "quant_kernel.cmxa"
+plugin(byte) = "quant_kernel.cma"
+plugin(native) = "quant_kernel.cmxs"

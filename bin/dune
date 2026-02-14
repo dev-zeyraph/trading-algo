@@ -1,0 +1,4 @@
+(executable
+ (public_name quant_kernel_main)
+ (name main)
+ (libraries quant_kernel lwt.unix))

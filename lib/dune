@@ -1,0 +1,22 @@
+(library
+ (name quant_kernel)
+ (public_name quant_kernel)
+ (libraries
+  ctypes
+  ctypes.foreign
+  bigarray
+  lwt
+  websocket-lwt-unix
+  yojson
+  unix
+  lwt_log)
+ (foreign_stubs
+  (language cxx)
+  (names
+   kernel_stubs
+   neural_calib
+   sabr_kernel
+   signature_kernel
+   kernel
+   markov_kernel)
+  (flags :standard -O3 -march=native -std=c++20 -fPIC)))
