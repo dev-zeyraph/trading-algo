@@ -8,6 +8,11 @@ module MarketData = struct
     iv: float;
   }
 
+  type gex_point = {
+    strike: float;
+    gex: float;
+  }
+
   type ticker = {
     symbol: string;
     price: float;
@@ -17,6 +22,9 @@ module MarketData = struct
     rv_20d: float;
     rv_60d: float;
     term_structure: term_point list;
+    gex_profile: gex_point list;
+    hurst_price: float;
+    hurst_vol: float;
     timestamp: float;
   }
 
@@ -32,6 +40,16 @@ module MarketData = struct
         ) 
       in
 
+      let gex_profile =
+        (try json |> member "gex_profile" |> to_list |> List.map (fun j ->
+          { strike = j |> member "strike" |> to_float;
+            gex = j |> member "gex" |> to_float }
+        ) with _ -> [])
+      in
+
+      let hurst_price = try json |> member "hurst_price" |> to_float with _ -> 0.5 in
+      let hurst_vol = try json |> member "hurst_vol" |> to_float with _ -> 0.5 in
+
       Some {
         symbol = json |> member "symbol" |> to_string;
         price = json |> member "price" |> to_float;
@@ -41,6 +59,9 @@ module MarketData = struct
         rv_20d = json |> member "rv_20d" |> to_float;
         rv_60d = json |> member "rv_60d" |> to_float;
         term_structure;
+        gex_profile;
+        hurst_price;
+        hurst_vol;
         timestamp = Unix.gettimeofday ();
       }
     with _ -> None
@@ -67,6 +88,9 @@ module MarketData = struct
             rv_20d = 0.38;
             rv_60d = 0.40;
             term_structure = [{days=30; iv=0.42}; {days=60; iv=0.40}];
+            gex_profile = [];
+            hurst_price = 0.5;
+            hurst_vol = 0.5;
             timestamp = Unix.gettimeofday ();
           }
       in

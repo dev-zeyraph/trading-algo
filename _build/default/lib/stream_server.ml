@@ -63,6 +63,9 @@ module Server = struct
             rv_20d = 0.28;
             rv_60d = 0.32;
             term_structure = [];
+            gex_profile = [];
+            hurst_price = 0.5;
+            hurst_vol = 0.5;
             timestamp = Unix.gettimeofday () 
           }
       in
@@ -80,7 +83,12 @@ module Server = struct
           ("rv_60d", `Float ticker.rv_60d);
           ("term_structure", `List (List.map (fun (p: Market_data.MarketData.term_point) -> 
             `Assoc [("days", `Int p.days); ("iv", `Float p.iv)]
-          ) ticker.term_structure))
+          ) ticker.term_structure));
+          ("gex_profile", `List (List.map (fun (g: Market_data.MarketData.gex_point) ->
+            `Assoc [("strike", `Float g.strike); ("gex", `Float g.gex)]
+          ) ticker.gex_profile));
+          ("hurst_price", `Float ticker.hurst_price);
+          ("hurst_vol", `Float ticker.hurst_vol)
         ])
       ] in
       let msg = Yojson.Basic.to_string json_data in
