@@ -1,9 +1,11 @@
 import React, { useMemo } from 'react'
 
-export default function RiskRadarPanel({ ticker, shocks }) {
+export default function RiskRadarPanel({ ticker, shocks, manifold }) {
     if (!ticker) return null
 
     const spot = ticker.price * (1 + (shocks?.spot || 0) / 100)
+    const exhaustion = manifold?.exhaustion || 0
+    const curvature = manifold?.curvature || 0
 
     // --- 1. GEX Profile — Real data from options chain ---
     const gexProfile = useMemo(() => {
@@ -39,6 +41,14 @@ export default function RiskRadarPanel({ ticker, shocks }) {
     }, [ticker, shocks, spot])
 
     const isInEnemyTerritory = Math.abs(sigmaBands.zScore) > 2.5
+    const isExhausted = exhaustion > 0.7
+
+    // Theme logic: Neon Cyan -> Amber
+    const headerClass = isExhausted
+        ? 'bg-accent-warn/30 border-accent-warn/50 animate-pulse'
+        : isInEnemyTerritory
+            ? 'bg-accent-risk/20 animate-pulse'
+            : 'bg-panel-alt'
 
     // --- 3. Ghost Signal — Real Hurst Exponents from R/S Analysis ---
     const ghostSignal = useMemo(() => {
@@ -55,14 +65,22 @@ export default function RiskRadarPanel({ ticker, shocks }) {
     }, [ticker.hurst_price, ticker.hurst_vol])
 
     return (
-        <div className="w-full h-full flex flex-col bg-panel-alt overflow-hidden">
+        <div className="w-full h-full flex flex-col bg-panel-alt overflow-hidden border-t border-border">
             {/* Header */}
-            <div className={`px-2 py-1.5 border-b border-border flex justify-between items-center ${isInEnemyTerritory ? 'bg-accent-risk/20 animate-pulse' : ''}`}>
-                <span className="font-label text-text-muted text-[10px] font-bold tracking-widest uppercase">
-                    {isInEnemyTerritory ? '⚠️ ENEMY TERRITORY DETECTED' : 'WAR ROOM: RISK RADAR'}
-                </span>
+            <div className={`px-2 py-1.5 border-b border-border flex justify-between items-center transition-colors duration-500 ${headerClass}`}>
+                <div className="flex flex-col">
+                    <span className={`font-label text-[10px] font-bold tracking-widest uppercase ${isExhausted ? 'text-accent-warn' : 'text-text-muted'}`}>
+                        {isExhausted ? '🔴 MANIFOLD EXHAUSTION' : isInEnemyTerritory ? '⚠️ ENEMY TERRITORY' : 'WAR ROOM: RISK RADAR'}
+                    </span>
+                    {manifold && (
+                        <div className="flex gap-2 font-mono text-[7px] text-text-dim">
+                            <span>FISHER-D: {manifold.fisher_distance.toFixed(4)}</span>
+                            <span>κ: {curvature.toFixed(4)}</span>
+                        </div>
+                    )}
+                </div>
                 <span className="font-mono text-[9px] text-text-dim">
-                    {gexProfile.length > 0 ? 'LIVE OPTIONS CHAIN' : 'AWAITING DATA'}
+                    {gexProfile.length > 0 ? 'LIVE GEX' : 'AWAITING DATA'}
                 </span>
             </div>
 

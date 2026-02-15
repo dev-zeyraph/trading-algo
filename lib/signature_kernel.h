@@ -16,4 +16,45 @@ extern "C" {
  */
 void compute_signature_level3(const double *path, size_t num_points,
                               double *output_signature);
+
+/**
+ * @brief Compute the Log-Signature via BCH (Baker-Campbell-Hausdorff)
+ * inversion.
+ *
+ * Maps the group element S(X) back to the Lie algebra via:
+ *   log(S) = S¹ - ½[S¹,S¹] + higher order BCH terms
+ *
+ * For a 2D path at level 3: output is 14 coefficients (levels 1-3, no
+ * constant).
+ *
+ * @param signature Level-3 signature (15 doubles)
+ * @param log_signature Output log-signature (14 doubles: 2 + 4 + 8)
+ */
+void compute_log_signature(const double *signature, double *log_signature);
+
+/**
+ * @brief Compute the Expected Signature over a sliding window.
+ *
+ * Φ(X)_{s,t} = E[Sig(X)] averaged over N overlapping sub-paths.
+ * Filters high-frequency noise while preserving topological structure.
+ *
+ * @param path Full path as flat array of (time, value) pairs.
+ * @param num_points Total number of points.
+ * @param window_size Number of points per sub-path window.
+ * @param expected_sig Output: averaged signature (15 doubles).
+ */
+void compute_expected_signature(const double *path, size_t num_points,
+                                size_t window_size, double *expected_sig);
+
+/**
+ * @brief Compute curvature of the path signature manifold.
+ *
+ * Measures how rapidly the signature coefficients are changing,
+ * indicating regime transitions or exhaustion.
+ *
+ * @param signatures Array of N consecutive signatures (N * 15 doubles).
+ * @param num_sigs Number of signature snapshots.
+ * @return Scalar curvature estimate.
+ */
+double compute_signature_curvature(const double *signatures, size_t num_sigs);
 }

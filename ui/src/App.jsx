@@ -8,6 +8,7 @@ import StockSelector from './components/StockSelector'
 import IntelligencePanel from './components/IntelligencePanel'
 import ScannerPanel from './components/ScannerPanel'
 import RiskRadarPanel from './components/RiskRadarPanel'
+import ManifoldMap from './components/ManifoldMap'
 import './index.css'
 
 const DEFAULT_PARAMS = { alpha: 0.25, beta: 0.5, rho: -0.5, nu: 0.4 }
@@ -28,6 +29,7 @@ const App = () => {
   const [ticker, setTicker] = useState(null)
   const [livePaths, setLivePaths] = useState([])
   const [signatures, setSignatures] = useState([])
+  const [manifold, setManifold] = useState(null)
   const [status, setStatus] = useState('CONNECTING')
   const [zenMode, setZenMode] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -59,29 +61,32 @@ const App = () => {
           if (msg.ticker) {
             setTicker(msg.ticker)
           }
-
-          // Generate mock signatures from paths for visualization
-          if (msg.paths && msg.paths.length > 0) {
-            const sigs = msg.paths.slice(0, 5).map(path => {
-              const n = path.length
-              const sig = []
-              // Level 1
-              sig.push(path[n - 1] - path[0])
-              sig.push((path[n - 1] - path[0]) / n)
-              // Level 2
-              for (let i = 0; i < 4; i++) {
-                const mid = Math.floor(n / 4 * (i + 1))
-                sig.push((path[mid] - path[Math.max(0, mid - 5)]) * 0.01)
-              }
-              // Level 3
-              for (let i = 0; i < 8; i++) {
-                const idx = Math.floor(n / 8 * (i + 1))
-                sig.push((path[idx] * 0.001) + Math.sin(idx * 0.1) * 0.01)
-              }
-              sig.push(sig.reduce((a, b) => a + Math.abs(b), 0))
-              return sig
-            })
-            setSignatures(sigs)
+          if (msg.manifold) {
+            setManifold(msg.manifold)
+          }
+          if (msg.signatures) {
+            // Generate mock signatures from paths for visualization
+            if (msg.paths && msg.paths.length > 0) {
+              const sigs = msg.paths.slice(0, 5).map(path => {
+                const n = path.length
+                const sig = []
+                // Level 1
+                sig.push(path[n - 1] - path[0])
+                sig.push((path[n - 1] - path[0]) / n)
+                // Level 2
+                for (let i = 0; i < 4; i++) {
+                  const mid = Math.floor(n / 4 * (i + 1))
+                  sig.push((path[mid] - path[Math.max(0, mid - 5)]) * 0.01)
+                }
+                // Level 3
+                for (let i = 0; i < 8; i++) {
+                  const idx = Math.floor(n / 8 * (i + 1))
+                  sig.push((path[idx] * 0.001) + Math.sin(idx * 0.1) * 0.01)
+                }
+                sig.push(sig.reduce((a, b) => a + Math.abs(b), 0))
+                return sig
+              })
+            }
           }
         }
       } catch (e) { }
@@ -276,7 +281,7 @@ const App = () => {
                   ))}
                 </div>
 
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 flex flex-col">
                   {activeRightPanel === 'INTEL' ? (
                     <IntelligencePanel
                       ticker={ticker}
@@ -291,10 +296,18 @@ const App = () => {
                       }}
                     />
                   ) : (
-                    <RiskRadarPanel
-                      ticker={ticker}
-                      shocks={shocks}
-                    />
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <div className="h-1/2 min-h-[150px]">
+                        <ManifoldMap manifold={manifold} />
+                      </div>
+                      <div className="flex-1 overflow-y-auto">
+                        <RiskRadarPanel
+                          ticker={ticker}
+                          shocks={shocks}
+                          manifold={manifold}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </motion.div>

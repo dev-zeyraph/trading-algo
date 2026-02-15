@@ -50,6 +50,39 @@ module Server = struct
         `List !spots
       in
 
+      (* Compute Manifold State from the first simulated path *)
+      let manifold_json =
+        if Array.length flattened > 0 then begin
+          let (first_path, _) = flattened.(0) in
+          (* Build signature history from all paths for curvature *)
+          let num_sigs = min 10 (Array.length flattened) in
+          let sig_history = Bigarray.Array1.create Bigarray.float64 Bigarray.c_layout (num_sigs * 15) in
+          for s = 0 to num_sigs - 1 do
+            let (_, path_sig) = flattened.(s) in
+            for k = 0 to 14 do
+              Bigarray.Array1.set sig_history (s * 15 + k) (Bigarray.Array1.get path_sig k)
+            done
+          done;
+          let state = Manifold_geometry.ManifoldGeometry.compute_state first_path sig_history num_sigs in
+          `Assoc [
+            ("fisher_distance", `Float state.fisher_distance);
+            ("curvature", `Float state.curvature);
+            ("exhaustion", `Float (Manifold_geometry.ManifoldGeometry.density_value state.exhaustion));
+            ("mu", `Float state.mu);
+            ("sigma2", `Float state.sigma2);
+            ("log_signature", `List (Array.to_list (Array.map (fun v -> `Float v) state.log_signature)))
+          ]
+        end else
+          `Assoc [
+            ("fisher_distance", `Float 0.0);
+            ("curvature", `Float 0.0);
+            ("exhaustion", `Float 0.5);
+            ("mu", `Float 0.0);
+            ("sigma2", `Float 0.0);
+            ("log_signature", `List [])
+          ]
+      in
+
       let symbol = !current_symbol in
       let ticker_opt = Market_data.MarketData.fetch_real_data ~symbol () in
       let ticker = match ticker_opt with
@@ -89,7 +122,8 @@ module Server = struct
           ) ticker.gex_profile));
           ("hurst_price", `Float ticker.hurst_price);
           ("hurst_vol", `Float ticker.hurst_vol)
-        ])
+        ]);
+        ("manifold", manifold_json)
       ] in
       let msg = Yojson.Basic.to_string json_data in
 
