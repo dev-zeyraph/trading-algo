@@ -57,27 +57,63 @@ export default function MarkovGrid({ states = 20, params, ticker }) {
 
         ctx.clearRect(0, 0, width, height)
 
-        // Column headers — vol levels (ATM ± 30%)
-        ctx.font = '8px JetBrains Mono'
+        // Labels
+        ctx.font = 'bold 9px "JetBrains Mono"'
+        ctx.fillStyle = '#64748b'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        const volLo = Math.max(0.05, atmVol * 0.7)
-        const volHi = atmVol * 1.3
-        for (let j = 0; j < states; j++) {
-            const v = volLo + (volHi - volLo) * j / (states - 1)
-            ctx.fillStyle = '#fefefeff'
-            ctx.fillText(`${(v * 100).toFixed(0)}%`, labelW + j * cellW + cellW / 2, labelH / 2)
+
+        // Status Header
+        ctx.textAlign = 'left'
+        ctx.fillStyle = '#8e96a3'
+        ctx.fillText(`TRANSITION KERNEL · ${states}×${states} · PRUNED <0.5%`, 10, 15)
+
+        // Column headers — vol levels
+        const volLo = Math.max(0.05, atmVol * 0.75)
+        const volHi = atmVol * 1.25
+        for (let i = 0; i < states; i++) {
+            const vol = volLo + (volHi - volLo) * (i / (states - 1))
+            const x = labelW + i * cellW + cellW / 2
+            ctx.save()
+            ctx.translate(x, height - 8)
+            ctx.fillText(`${(vol * 100).toFixed(1)}%`, 0, 0)
+            ctx.restore()
         }
 
-        // Row headers — price levels (spot ± 2%)
-        const priceLo = spot * 0.98
-        const priceHi = spot * 1.02
-        for (let i = 0; i < states; i++) {
-            const p = priceLo + (priceHi - priceLo) * i / (states - 1)
-            ctx.fillStyle = '#f9f9fbff'
-            ctx.textAlign = 'right'
-            ctx.fillText(`$${p.toFixed(1)}`, labelW - 4, labelH + i * cellH + cellH / 2)
+        // Row headers — price levels
+        const priceLo = spot * 0.985
+        const priceHi = spot * 1.015
+        ctx.textAlign = 'right'
+        for (let j = 0; j < states; j++) {
+            const price = priceHi - (priceHi - priceLo) * (j / (states - 1))
+            const y = labelH + j * cellH + cellH / 2
+            ctx.fillText(price.toFixed(1), labelW - 5, y)
+        }
 
+        // Horizontal Grid Helper
+        ctx.strokeStyle = '#22252a'
+        ctx.lineWidth = 0.5
+        for (let j = 0; j <= states; j++) {
+            const y = labelH + j * cellH
+            ctx.beginPath()
+            ctx.moveTo(labelW, y)
+            ctx.lineTo(width, y)
+            ctx.stroke()
+        }
+        for (let i = 0; i <= states; i++) {
+            const x = labelW + i * cellW
+            ctx.beginPath()
+            ctx.moveTo(x, labelH)
+            ctx.lineTo(x, height - labelH)
+            ctx.stroke()
+        }
+
+        // Matrix Rendering
+        const colors = {
+            low: [34, 37, 42],      // --color-border
+            high: [0, 255, 65]      // Institutional Green
+        }
+        for (let i = 0; i < states; i++) {
             for (let j = 0; j < states; j++) {
                 const x = labelW + j * cellW
                 const y = labelH + i * cellH

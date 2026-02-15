@@ -4,6 +4,10 @@ import VolSurface from './components/VolSurface'
 import SignatureViz from './components/SignatureViz'
 import MarkovGrid from './components/MarkovGrid'
 import CommandBar from './components/CommandBar'
+import StockSelector from './components/StockSelector'
+import IntelligencePanel from './components/IntelligencePanel'
+import ScannerPanel from './components/ScannerPanel'
+import RiskRadarPanel from './components/RiskRadarPanel'
 import './index.css'
 
 const DEFAULT_PARAMS = { alpha: 0.25, beta: 0.5, rho: -0.5, nu: 0.4 }
@@ -28,6 +32,10 @@ const App = () => {
   const [zenMode, setZenMode] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [gridSize, setGridSize] = useState(20)
+  const [selectedSymbol, setSelectedSymbol] = useState('NVDA')
+  const [stockOpen, setStockOpen] = useState(false)
+  const [shocks, setShocks] = useState({ spot: 0, vol: 0 }) // % offsets
+  const [activeRightPanel, setActiveRightPanel] = useState('INTEL') // INTEL | SCANNER | RISK
   const wsRef = useRef(null)
 
   // WebSocket connection
@@ -82,6 +90,16 @@ const App = () => {
     return () => ws.close()
   }, [])
 
+  // Sync Ticker Selection with Backend
+  useEffect(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'switch_symbol',
+        symbol: selectedSymbol
+      }))
+    }
+  }, [selectedSymbol])
+
   // Global keyboard shortcut
   useEffect(() => {
     const handleKey = (e) => {
@@ -115,13 +133,26 @@ const App = () => {
     }
   }, [])
 
+  // Symbol switching
+  const handleSwitchSymbol = useCallback((symbol) => {
+    setSelectedSymbol(symbol)
+    // Clear stale data
+    setTicker(null)
+    setLivePaths([])
+    setSignatures([])
+    // Notify WebSocket server
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'switch_symbol', symbol }))
+    }
+  }, [])
+
   const statusColor =
     status === 'LIVE' ? 'text-accent-itm' :
       status === 'CONNECTING' ? 'text-accent-warn' : 'text-accent-risk'
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-base">
-      {/* Header Ticker Bar */}
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-base text-text-primary">
+      {/* Institutional Header */}
       <AnimatePresence>
         {!zenMode && (
           <motion.header
@@ -129,58 +160,85 @@ const App = () => {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="border-b border-border flex-shrink-0"
+            className="border-b border-border bg-panel-alt flex-shrink-0"
           >
-            <div className="flex items-center justify-between px-4 py-1.5">
-              <div className="flex items-center gap-4">
-                <span className="font-label text-xs font-semibold text-text-primary tracking-wider">QUANT KERNEL</span>
-                <span className={`font-mono text-xs ${statusColor}`}>● {status}</span>
+            <div className="flex items-center justify-between px-3 py-1">
+              <div className="flex items-center gap-3">
+                <span className="font-label text-[11px] font-bold text-text-primary tracking-widest uppercase">Quant Kernel</span>
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 border border-border bg-base ${statusColor}`}>
+                  <span className="text-[10px] scale-75">●</span>
+                  <span className="font-mono text-[10px] font-bold tracking-tighter uppercase">{status}</span>
+                </div>
               </div>
               {ticker && (
-                <div className="flex items-center gap-5 font-mono text-xs">
-                  <span className="text-text-primary font-semibold">{ticker.symbol}</span>
-                  <span className="text-text-muted">LAST <span className="text-accent-itm">{ticker.price?.toFixed(2)}</span></span>
-                  <span className="text-text-muted">ATM <span className="text-accent-data">{(ticker.vol * 100)?.toFixed(1)}%</span></span>
-                  <span className="text-text-muted">SKEW <span className="text-accent-risk">{(ticker.skew * 100)?.toFixed(1)}%</span></span>
-                  <span className="text-text-muted">FLY <span className="text-accent-warn">{(ticker.fly * 100)?.toFixed(1)}%</span></span>
+                <div className="flex items-center gap-6 font-mono text-[11px]">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-text-dim uppercase leading-none mb-0.5">Ticker</span>
+                    <span
+                      className="text-accent-itm font-bold cursor-pointer hover:bg-white/5 px-0.5 -mx-0.5"
+                      onClick={() => setStockOpen(true)}
+                    >
+                      {ticker.symbol}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-text-dim uppercase leading-none mb-0.5">Last</span>
+                    <span className="text-text-primary font-bold">{ticker.price?.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-text-dim uppercase leading-none mb-0.5">Vol (ATM)</span>
+                    <span className="text-accent-data font-bold">{(ticker.vol * 100)?.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-text-dim uppercase leading-none mb-0.5">Skew</span>
+                    <span className="text-accent-risk font-bold">{(ticker.skew * 100)?.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-text-dim uppercase leading-none mb-0.5">Fly</span>
+                    <span className="text-accent-warn font-bold">{(ticker.fly * 100)?.toFixed(1)}%</span>
+                  </div>
                 </div>
               )}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => setZenMode(prev => !prev)}
-                  className="font-mono text-xs text-text-dim hover:text-text-muted px-2 py-0.5 border border-border cursor-pointer"
-                  style={{ borderRadius: 2 }}
+                  onClick={() => setShocks({ spot: 0, vol: 0 })}
+                  className={`font-mono text-[10px] px-2 py-1 border border-border cursor-pointer transition-colors ${shocks.spot !== 0 || shocks.vol !== 0 ? 'text-accent-warn border-accent-warn bg-accent-warn/10' : 'text-text-dim opacity-40 select-none'}`}
                 >
-                  ZEN
+                  RESET SHOCKS
                 </button>
-                <button
-                  onClick={() => setCmdOpen(true)}
-                  className="font-mono text-xs text-text-dim hover:text-text-muted px-2 py-0.5 border border-border cursor-pointer"
-                  style={{ borderRadius: 2 }}
-                >
-                  ⌘K
-                </button>
+
+                {['STOCKS', 'ZEN', '⌘K'].map(label => (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      if (label === 'STOCKS') setStockOpen(true)
+                      else if (label === 'ZEN') setZenMode(prev => !prev)
+                      else if (label === '⌘K') setCmdOpen(true)
+                    }}
+                    className="font-mono text-[10px] text-text-muted hover:text-text-primary hover:bg-border px-2 py-1 border border-border cursor-pointer transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
           </motion.header>
         )}
       </AnimatePresence>
 
-      {/* Main Grid */}
-      <div className={`flex-1 min-h-0 ${zenMode ? 'p-0' : 'p-1'} flex flex-col gap-1`}>
+      {/* Main Grid - Tight Spacing */}
+      <div className={`flex-1 min-h-0 ${zenMode ? 'p-0' : 'p-[2px]'} flex flex-col gap-[2px]`}>
         {/* Top Row: Surface + Signature */}
-        <div className={`flex gap-1 ${zenMode ? 'flex-1' : 'h-[55%]'}`}>
-          <div className={`panel ${zenMode ? 'flex-1' : 'w-[60%]'}`}>
-            <VolSurface params={params} />
+        <div className={`flex gap-[2px] ${zenMode ? 'flex-1' : 'h-[55%]'}`}>
+          <div className={`panel ${zenMode ? 'flex-1' : 'w-1/2'}`}>
+            <VolSurface params={params} shocks={shocks} />
           </div>
           <AnimatePresence>
             {!zenMode && (
               <motion.div
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: '40%', opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="panel"
+                initial={{ width: 0 }}
+                animate={{ width: '50%' }}
+                className="panel border-l-0"
               >
                 <SignatureViz paths={livePaths} signatures={signatures} />
               </motion.div>
@@ -188,47 +246,79 @@ const App = () => {
           </AnimatePresence>
         </div>
 
-        {/* Bottom Row: Markov Grid */}
+        {/* Bottom Row: Markov + Intelligence */}
         <AnimatePresence>
           {!zenMode && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: '45%', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="panel"
-            >
-              <MarkovGrid states={gridSize} params={params} ticker={ticker} />
-            </motion.div>
+            <div className="flex flex-1 gap-[2px] min-h-0">
+              <motion.div
+                initial={{ height: 0 }}
+                animate={{ height: 'auto' }}
+                className="panel w-1/2"
+              >
+                <MarkovGrid states={gridSize} params={params} ticker={ticker} />
+              </motion.div>
+              <motion.div
+                initial={{ height: 0 }}
+                animate={{ height: 'auto' }}
+                className="panel w-1/2 border-l-0 flex flex-col"
+              >
+                {/* Panel Tabs */}
+                <div className="flex bg-panel-alt border-b border-border">
+                  {['INTEL', 'SCANNER', 'RISK'].map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveRightPanel(tab)}
+                      className={`px-3 py-1 font-mono text-[9px] uppercase tracking-widest cursor-pointer transition-colors ${activeRightPanel === tab ? 'bg-panel text-accent-data border-r border-border' : 'text-text-dim hover:text-text-muted border-r border-border/50'
+                        }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex-1 min-h-0">
+                  {activeRightPanel === 'INTEL' ? (
+                    <IntelligencePanel
+                      ticker={ticker}
+                      params={params}
+                      shocks={shocks}
+                      onShockChange={setShocks}
+                    />
+                  ) : activeRightPanel === 'SCANNER' ? (
+                    <ScannerPanel
+                      onSelectTicker={(sym) => {
+                        setSelectedSymbol(sym);
+                      }}
+                    />
+                  ) : (
+                    <RiskRadarPanel
+                      ticker={ticker}
+                      shocks={shocks}
+                    />
+                  )}
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
-      </div>
 
-      {/* Zen Mode Floating Controls */}
-      {zenMode && (
-        <div className="fixed bottom-4 right-4 flex items-center gap-2 z-50">
-          <button
-            onClick={() => setZenMode(false)}
-            className="font-mono text-xs text-text-dim hover:text-accent-itm px-3 py-1.5 bg-panel border border-border cursor-pointer"
-            style={{ borderRadius: 2 }}
-          >
-            EXIT ZEN
-          </button>
-          <button
-            onClick={() => setCmdOpen(true)}
-            className="font-mono text-xs text-text-dim hover:text-accent-data px-3 py-1.5 bg-panel border border-border cursor-pointer"
-            style={{ borderRadius: 2 }}
-          >
-            ⌘K
-          </button>
-        </div>
-      )}
+        {/* Global Overlays */}
+
+      </div>
 
       {/* Command Bar */}
       <CommandBar
         isOpen={cmdOpen}
         onClose={() => setCmdOpen(false)}
         onCommand={handleCommand}
+      />
+
+      {/* Stock Selector */}
+      <StockSelector
+        selectedSymbol={selectedSymbol}
+        onSelect={handleSwitchSymbol}
+        isOpen={stockOpen}
+        onClose={() => setStockOpen(false)}
       />
     </div>
   )

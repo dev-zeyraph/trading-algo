@@ -3,12 +3,20 @@ open Lwt.Infix
 module MarketData = struct
   let section = Lwt_log.Section.make "market_data"
 
+  type term_point = {
+    days: int;
+    iv: float;
+  }
+
   type ticker = {
     symbol: string;
     price: float;
     atm_vol: float;
     skew_25d: float;
     fly_25d: float;
+    rv_20d: float;
+    rv_60d: float;
+    term_structure: term_point list;
     timestamp: float;
   }
 
@@ -16,41 +24,54 @@ module MarketData = struct
     try
       let json = Yojson.Safe.from_string json_str in
       let open Yojson.Safe.Util in
+      
+      let term_structure = 
+        json |> member "term_structure" |> to_list |> List.map (fun j ->
+          { days = j |> member "days" |> to_int;
+            iv = j |> member "iv" |> to_float }
+        ) 
+      in
+
       Some {
         symbol = json |> member "symbol" |> to_string;
         price = json |> member "price" |> to_float;
         atm_vol = json |> member "vol" |> to_float;
         skew_25d = json |> member "skew" |> to_float;
         fly_25d = json |> member "fly" |> to_float;
+        rv_20d = json |> member "rv_20d" |> to_float;
+        rv_60d = json |> member "rv_60d" |> to_float;
+        term_structure;
         timestamp = Unix.gettimeofday ();
       }
     with _ -> None
 
-  (* Fetch real-world data using the Python bridge *)
-  let fetch_real_data () =
-    let cmd = "python3 lib/fetch_yahoo.py" in
+  (* Fetch real-world data for any symbol using the Python bridge *)
+  let fetch_real_data ?(symbol="NVDA") () =
+    let cmd = Printf.sprintf "python3 lib/fetch_yahoo.py %s" symbol in
     let chan = Unix.open_process_in cmd in
     let line = try input_line chan with End_of_file -> "" in
     ignore (Unix.close_process_in chan);
     parse_ticker line
 
-  (* Simulator for "connect data" effect, now with real-world fetch fallback *)
-  let run_simulator on_update =
+  let run_simulator ?(symbol="NVDA") on_update =
     let rec loop () =
-      let t_opt = fetch_real_data () in
+      let t_opt = fetch_real_data ~symbol () in
       let t = match t_opt with
         | Some t -> t
         | None -> {
-            symbol = "NVDA (SIM)";
+            symbol = symbol ^ " (SIM)";
             price = 135.0 +. (Random.float 2.0 -. 1.0);
             atm_vol = 0.42;
             skew_25d = -0.05;
             fly_25d = 0.02;
+            rv_20d = 0.38;
+            rv_60d = 0.40;
+            term_structure = [{days=30; iv=0.42}; {days=60; iv=0.40}];
             timestamp = Unix.gettimeofday ();
           }
       in
       on_update t >>= fun () ->
-      Lwt_unix.sleep 5.0 >>= loop (* Fetch every 5 seconds *)
+      Lwt_unix.sleep 5.0 >>= loop
     in
     loop ()
 end

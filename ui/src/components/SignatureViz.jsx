@@ -120,28 +120,18 @@ export default function SignatureViz({ paths, signatures }) {
     }, [paths, signatures, mode])
 
     return (
-        <div className="w-full h-full relative flex flex-col">
-            <div className="flex items-center justify-between px-3 pt-2 pb-1">
-                <span className="font-label text-text-muted text-xs tracking-wider uppercase">
-                    Path Signature · r-Bergomi
-                </span>
-                <div className="flex gap-0.5">
+        <div className="w-full h-full flex flex-col p-2.5 gap-2.5 bg-panel">
+            <div className="flex items-center justify-between border-b border-border pb-1">
+                <span className="font-label text-text-muted text-[10px] font-bold tracking-widest uppercase">Path Signature · Rough-Bergomi Inference</span>
+                <div className="flex gap-1">
                     <button
-                        onClick={() => setMode('price')}
-                        className={`px-2 py-0.5 text-xs font-mono cursor-pointer border border-border ${mode === 'price' ? 'bg-accent-data/20 text-accent-data border-accent-data' : 'bg-transparent text-text-dim hover:text-text-muted'
-                            }`}
-                        style={{ borderRadius: '2px' }}
-                    >
-                        PRICE
-                    </button>
+                        onClick={() => setMode('PRICE')}
+                        className={`px-2 py-0.5 font-mono text-[9px] border transition-colors ${mode === 'PRICE' ? 'border-accent-data bg-accent-data text-white' : 'border-border text-text-dim'}`}
+                    >PRICE</button>
                     <button
-                        onClick={() => setMode('signature')}
-                        className={`px-2 py-0.5 text-xs font-mono cursor-pointer border border-border ${mode === 'signature' ? 'bg-accent-data/20 text-accent-data border-accent-data' : 'bg-transparent text-text-dim hover:text-text-muted'
-                            }`}
-                        style={{ borderRadius: '2px' }}
-                    >
-                        SIG∫
-                    </button>
+                        onClick={() => setMode('SIG')}
+                        className={`px-2 py-0.5 font-mono text-[9px] border transition-colors ${mode === 'SIG' ? 'border-accent-data bg-accent-data text-white' : 'border-border text-text-dim'}`}
+                    >SIG∫</button>
                 </div>
             </div>
             <div className="flex-1 min-h-0">

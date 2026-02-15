@@ -7,8 +7,28 @@ module Server = struct
 
   let handle_client (conn : Connected_client.t) =
     let id = Random.int 1000 in
+    let current_symbol = ref "NVDA" in
     Lwt_log.info_f ~section "Client %d connected" id >>= fun () ->
-    
+
+    (* Listen for incoming messages (symbol switches) *)
+    let rec listen_loop () =
+      Lwt.catch (fun () ->
+        Connected_client.recv conn >>= fun frame ->
+        let content = frame.Websocket.Frame.content in
+        (try
+          let json = Yojson.Safe.from_string content in
+          let open Yojson.Safe.Util in
+          let msg_type = json |> member "type" |> to_string in
+          if msg_type = "switch_symbol" then begin
+            let sym = json |> member "symbol" |> to_string in
+            current_symbol := sym;
+            Lwt_log.info_f ~section "Client %d switched to %s" id sym |> Lwt.ignore_result
+          end
+        with _ -> ());
+        listen_loop ()
+      ) (fun _ -> Lwt.return_unit)
+    in
+
     let rec stream_data () =
       let config : Engine.config = {
         num_paths = 5;
@@ -16,10 +36,10 @@ module Server = struct
         dt = 0.01;
         num_domains = 1;
       } in
-      
+
       let results = Engine.run_parallel config (100.0, 0.2) 0.5 (-0.5) 0.4 in
       let flattened = Array.concat results in
-      
+
       let serialize_path (path, _sig) =
         let n = Bigarray.Array1.dim path / 2 in
         let spots = ref [] in
@@ -30,10 +50,21 @@ module Server = struct
         `List !spots
       in
 
-      let ticker_opt = Market_data.MarketData.fetch_real_data () in
+      let symbol = !current_symbol in
+      let ticker_opt = Market_data.MarketData.fetch_real_data ~symbol () in
       let ticker = match ticker_opt with
         | Some t -> t
-        | None -> { Market_data.MarketData.symbol = "NVDA"; price = 135.0; atm_vol = 0.42; skew_25d = -0.05; fly_25d = 0.02; timestamp = Unix.gettimeofday () }
+        | None -> { 
+            Market_data.MarketData.symbol; 
+            price = 100.0; 
+            atm_vol = 0.30; 
+            skew_25d = -0.04; 
+            fly_25d = 0.015;
+            rv_20d = 0.28;
+            rv_60d = 0.32;
+            term_structure = [];
+            timestamp = Unix.gettimeofday () 
+          }
       in
 
       let json_data = `Assoc [
@@ -44,16 +75,24 @@ module Server = struct
           ("price", `Float ticker.price);
           ("vol", `Float ticker.atm_vol);
           ("skew", `Float ticker.skew_25d);
-          ("fly", `Float ticker.fly_25d)
+          ("fly", `Float ticker.fly_25d);
+          ("rv_20d", `Float ticker.rv_20d);
+          ("rv_60d", `Float ticker.rv_60d);
+          ("term_structure", `List (List.map (fun (p: Market_data.MarketData.term_point) -> 
+            `Assoc [("days", `Int p.days); ("iv", `Float p.iv)]
+          ) ticker.term_structure))
         ])
       ] in
       let msg = Yojson.Basic.to_string json_data in
-      
+
       Connected_client.send conn (Websocket.Frame.create ~content:msg ()) >>= fun () ->
       Lwt_unix.sleep 0.5 >>= stream_data
     in
-    
-    Lwt.catch stream_data (fun _ -> 
+
+    (* Run listener and streamer concurrently *)
+    Lwt.catch (fun () ->
+      Lwt.pick [listen_loop (); stream_data ()]
+    ) (fun _ ->
       Lwt_log.info_f ~section "Client %d disconnected" id
     )
 
