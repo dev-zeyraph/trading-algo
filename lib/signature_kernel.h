@@ -57,4 +57,16 @@ void compute_expected_signature(const double *path, size_t num_points,
  * @return Scalar curvature estimate.
  */
 double compute_signature_curvature(const double *signatures, size_t num_sigs);
+
+/**
+ * @brief Compute the Frechet Mean (Riemannian Centroid) on Fisher Manifold.
+ *
+ * @param manifold_points Flattened array of (mu, sigma2) pairs.
+ *                        Length should be 2 * num_points.
+ * @param num_points Number of (mu, sigma2) pairs.
+ * @param mu_centroid Output: The mu component of the Frechet mean.
+ * @param sigma2_centroid Output: The sigma2 component of the Frechet mean.
+ */
+void compute_frechet_mean(const double *manifold_points, size_t num_points,
+                          double *mu_centroid, double *sigma2_centroid);
 }

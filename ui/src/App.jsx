@@ -9,6 +9,8 @@ import IntelligencePanel from './components/IntelligencePanel'
 import ScannerPanel from './components/ScannerPanel'
 import RiskRadarPanel from './components/RiskRadarPanel'
 import ManifoldMap from './components/ManifoldMap'
+import MathDebugger from './components/MathDebugger'
+import ResearchLabPanel from './components/ResearchLabPanel'
 import './index.css'
 
 const DEFAULT_PARAMS = { alpha: 0.25, beta: 0.5, rho: -0.5, nu: 0.4 }
@@ -125,6 +127,11 @@ const App = () => {
     switch (parsed.cmd) {
       case 'SABR':
         dispatch({ type: 'SET', payload: parsed.args })
+        break
+      case 'HESTON':
+        // [GOD MATH] In a real app, we'd dispatch this to the backend param state.
+        // For now, we just log it as a "Simulation Stress Test"
+        console.log(`[SIMULATION] Heston Vol-of-Vol set to: ${parsed.args.xi}`);
         break
       case 'ZEN':
         setZenMode(prev => !prev)
@@ -269,7 +276,7 @@ const App = () => {
               >
                 {/* Panel Tabs */}
                 <div className="flex bg-panel-alt border-b border-border">
-                  {['INTEL', 'SCANNER', 'RISK'].map(tab => (
+                  {['INTEL', 'SCANNER', 'RISK', 'LAB'].map(tab => (
                     <button
                       key={tab}
                       onClick={() => setActiveRightPanel(tab)}
@@ -283,18 +290,26 @@ const App = () => {
 
                 <div className="flex-1 min-h-0 flex flex-col">
                   {activeRightPanel === 'INTEL' ? (
-                    <IntelligencePanel
-                      ticker={ticker}
-                      params={params}
-                      shocks={shocks}
-                      onShockChange={setShocks}
-                    />
+                    <div className="h-full overflow-y-auto p-2 space-y-2">
+                      <div className="text-xs font-mono text-emerald-400 mb-2">
+                        [INTEL STREAM ACTIVE]
+                      </div>
+                      <MathDebugger manifold={manifold} />
+                      <IntelligencePanel
+                        ticker={ticker}
+                        params={params}
+                        shocks={shocks}
+                        onShockChange={setShocks}
+                      />
+                    </div>
                   ) : activeRightPanel === 'SCANNER' ? (
                     <ScannerPanel
                       onSelectTicker={(sym) => {
                         setSelectedSymbol(sym);
                       }}
                     />
+                  ) : activeRightPanel === 'LAB' ? (
+                    <ResearchLabPanel />
                   ) : (
                     <div className="flex-1 flex flex-col min-h-0">
                       <div className="h-1/2 min-h-[150px]">

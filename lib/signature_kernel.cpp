@@ -13,6 +13,20 @@ extern "C" {
 // =============================================================================
 // Level-3 Path Signature (existing, NEON-accelerated)
 // =============================================================================
+/*
+   [PLAIN ENGLISH]: Calculates the "Geometric Fingerprint" of a price path.
+   It captures not just where the price went (Level 1), but the "loops" (Level
+   2) and "shapes" (Level 3) it drew along the way.
+
+   [HS MATH]:
+   - Level 1: Displacement (Ending Point - Starting Point)
+   - Level 2: Area (The space inside the loop the price drew)
+   - Level 3: Volume (The 3D shape of the path in time-price-vol space)
+
+   [SAFETY]:
+   - Crashes if path is nullptr.
+   - Returns trivial signature [1, 0...] if num_points < 2.
+*/
 void compute_signature_level3(const double *path, size_t num_points,
                               double *output) {
   if (num_points < 2)
@@ -130,22 +144,30 @@ void compute_signature_level3(const double *path, size_t num_points,
 // =============================================================================
 // Log-Signature via Baker-Campbell-Hausdorff (BCH) Inversion
 // =============================================================================
-// For a 2D path at level 3, the log-signature lives in the free Lie algebra.
-// We use the formula: log(S) ≈ (S-1) - ½(S-1)² + ⅓(S-1)³
-// Projected onto the Lie algebra basis using the Dynkin map.
-//
-// Level 1: l¹_i = S¹_i  (direct copy)
-// Level 2: l²_ij = S²_ij - ½ S¹_i S¹_j  (antisymmetric part = Lie bracket)
-// Level 3: l³_ijk = S³_ijk - ½(S¹_i S²_jk + S²_ij S¹_k) + ⅓ S¹_i S¹_j S¹_k
-//
-// Output layout (14 terms):
-//   [0..1]   = Level 1: l¹_0, l¹_1
-//   [2..5]   = Level 2: l²_00, l²_01, l²_10, l²_11
-//   [6..13]  = Level 3: l³_000 ... l³_111
+/*
+   [PLAIN ENGLISH]: Compresses the Signature into its most efficient form.
+   A standard Signature has redundant info (like "Area" and "Area x 2").
+   The Log-Signature removes this redundancy, keeping only the "Generator"
+   terms.
 
+   [HS MATH]:
+   Log(Sig) = (Sig - 1) - 1/2(Sig - 1)^2 + 1/3(Sig - 1)^3
+   It's like taking the logarithm of a number, but for a geometric shape.
+
+   [SAFETY]:
+   - Output array must be size 14.
+   - Input sig must be size 15.
+*/
 void compute_log_signature(const double *sig, double *logsig) {
   // Level 1: direct copy of signature level 1
   // sig layout: [0]=1, [1..2]=L1, [3..6]=L2, [7..14]=L3
+  if (sig == nullptr || logsig == nullptr)
+    return; // Safety check
+
+  // Phase 26: Safety Check
+  if (sig == nullptr || logsig == nullptr)
+    return;
+
   double s1_0 = sig[1];
   double s1_1 = sig[2];
 
@@ -296,3 +318,71 @@ double compute_signature_curvature(const double *signatures, size_t num_sigs) {
 }
 
 } // extern "C"
+
+// Phase 25: Frechet Mean Algorithm (Riemannian Center of Mass)
+/*
+   [PLAIN ENGLISH]: Finds the "Center" of a cloud of points on a curved surface.
+   On a flat paper, the average is just Sum / N.
+   On a curved sphere (or hyperbolic manifold), the average must logically
+   "follow the curve."
+
+   [HS MATH]:
+   Minimizes the sum of squared "Walking Distances" (Geodesic) to all points.
+
+   [SAFETY]:
+   - Iterative algorithm (Gradient Descent). Can diverge if learning rate is too
+   high.
+   - Hard-coded MAX_ITER = 100 to prevent infinite loops.
+*/
+void compute_frechet_mean(const double *manifold_points, size_t num_points,
+                          double *mu_centroid, double *sigma2_centroid) {
+  if (num_points == 0) {
+    *mu_centroid = 0.0;
+    *sigma2_centroid = 1.0;
+    return;
+  }
+
+  // Initial guess: Arithmetic mean (Euclidean approximation)
+  double mu_curr = 0.0;
+  double sigma2_curr = 0.0;
+
+  for (size_t i = 0; i < num_points; ++i) {
+    mu_curr += manifold_points[2 * i];
+    sigma2_curr += manifold_points[2 * i + 1];
+  }
+  mu_curr /= static_cast<double>(num_points);
+  sigma2_curr /= static_cast<double>(num_points);
+
+  // Riemannian Gradient Descent
+  const int MAX_ITER = 100;
+  const double LEARNING_RATE = 0.1;
+  const double TOLERANCE = 1e-6;
+
+  for (int iter = 0; iter < MAX_ITER; ++iter) {
+    double vec_mu_sum = 0.0;
+    double vec_sigma_sum = 0.0;
+
+    for (size_t i = 0; i < num_points; ++i) {
+      double mu_i = manifold_points[2 * i];
+      double s2_i = manifold_points[2 * i + 1];
+
+      vec_mu_sum += (mu_i - mu_curr);
+      vec_sigma_sum += (s2_i - sigma2_curr);
+    }
+
+    double d_mu = (vec_mu_sum / static_cast<double>(num_points));
+    double d_s2 = (vec_sigma_sum / static_cast<double>(num_points));
+
+    if (std::abs(d_mu) < TOLERANCE && std::abs(d_s2) < TOLERANCE)
+      break;
+
+    mu_curr += LEARNING_RATE * d_mu;
+    sigma2_curr += LEARNING_RATE * d_s2;
+
+    if (sigma2_curr < 1e-6)
+      sigma2_curr = 1e-6;
+  }
+
+  *mu_centroid = mu_curr;
+  *sigma2_centroid = sigma2_curr;
+}

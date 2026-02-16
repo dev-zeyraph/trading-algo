@@ -10,6 +10,8 @@ module Signature = struct
     int -> 
     (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t -> 
     unit = "caml_compute_signature_level3"
+  (* Phase 25: Manifold Calibration *)
+  external compute_frechet_mean : float array -> float * float = "caml_compute_frechet_mean"
 
   external compute_log_signature_stub :
     (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t ->

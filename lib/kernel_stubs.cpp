@@ -71,3 +71,27 @@ CAMLprim value caml_compute_signature_curvature(value v_sigs, value v_n) {
   return caml_copy_double(curvature);
 }
 }
+
+extern "C" CAMLprim value caml_compute_frechet_mean(value v_points) {
+  CAMLparam1(v_points);
+  CAMLlocal1(v_res);
+
+  std::vector<double> points;
+  int n = Wosize_val(v_points) / Double_wosize;
+  for (int i = 0; i < n; i++) {
+    points.push_back(Double_field(v_points, i));
+  }
+
+  double mu = 0.0;
+  double sigma2 = 0.0;
+  // points size is 2 * num_points because it's [mu, s2, mu, s2...]
+  // But verify input format. OCaml passed a float array of size 2*N.
+  // So num_points = n / 2.
+  compute_frechet_mean(points.data(), n / 2, &mu, &sigma2);
+
+  v_res = caml_alloc(2, 0); // Tag 0 for tuple
+  Store_field(v_res, 0, caml_copy_double(mu));
+  Store_field(v_res, 1, caml_copy_double(sigma2));
+
+  CAMLreturn(v_res);
+}

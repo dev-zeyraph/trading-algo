@@ -1,43 +1,44 @@
 open Lwt.Infix
 open Websocket_lwt_unix
-open Monte_carlo
 
-module Server = struct
-  let section = Lwt_log.Section.make "stream_server"
+let section = Lwt_log.Section.make "stream_server"
 
-  let handle_client (conn : Connected_client.t) =
-    let id = Random.int 1000 in
-    let current_symbol = ref "NVDA" in
-    Lwt_log.info_f ~section "Client %d connected" id >>= fun () ->
+let handle_client (conn : Connected_client.t) =
+  let id = Random.int 1000 in
+  let current_symbol = ref "NVDA" in
+  Lwt_log.info_f ~section "Client %d connected" id >>= fun () ->
 
-    (* Listen for incoming messages (symbol switches) *)
-    let rec listen_loop () =
-      Lwt.catch (fun () ->
-        Connected_client.recv conn >>= fun frame ->
-        let content = frame.Websocket.Frame.content in
-        (try
-          let json = Yojson.Safe.from_string content in
-          let open Yojson.Safe.Util in
-          let msg_type = json |> member "type" |> to_string in
-          if msg_type = "switch_symbol" then begin
-            let sym = json |> member "symbol" |> to_string in
-            current_symbol := sym;
-            Lwt_log.info_f ~section "Client %d switched to %s" id sym |> Lwt.ignore_result
-          end
-        with _ -> ());
-        listen_loop ()
-      ) (fun _ -> Lwt.return_unit)
-    in
+  (* Listen for incoming messages (symbol switches) *)
+  let rec listen_loop () =
+    Lwt.catch (fun () ->
+      Connected_client.recv conn >>= fun frame ->
+      let content = frame.Websocket.Frame.content in
+      (try
+        let json = Yojson.Safe.from_string content in
+        let open Yojson.Safe.Util in
+        let msg_type = json |> member "type" |> to_string in
+        if msg_type = "switch_symbol" then begin
+          let sym = json |> member "symbol" |> to_string in
+          current_symbol := sym;
+          Lwt_log.info_f ~section "Client %d switched to %s" id sym |> Lwt.ignore_result
+        end
+      with _ -> ());
+      listen_loop ()
+    ) (fun _ -> Lwt.return_unit)
+  in
+
+    let tick_count = ref 0 in
 
     let rec stream_data () =
-      let config : Engine.config = {
+      incr tick_count;
+      let config : Monte_carlo.Engine.config = {
         num_paths = 5;
         num_steps = 100;
         dt = 0.01;
         num_domains = 1;
       } in
 
-      let results = Engine.run_parallel config (100.0, 0.2) 0.5 (-0.5) 0.4 in
+      let results = Monte_carlo.Engine.run_parallel config (100.0, 0.2) 0.5 (-0.5) 0.4 in
       let flattened = Array.concat results in
 
       let serialize_path (path, _sig) =
@@ -63,11 +64,20 @@ module Server = struct
               Bigarray.Array1.set sig_history (s * 15 + k) (Bigarray.Array1.get path_sig k)
             done
           done;
-          let state = Manifold_geometry.ManifoldGeometry.compute_state first_path sig_history num_sigs in
+          let state = Manifold_geometry.compute_state first_path sig_history num_sigs in
+          
+          (* TRIGGER RESEARCH BRIDGE EVERY 5 SECONDS (approx 10 ticks) *)
+          if !tick_count mod 10 = 0 then (
+            (* Convert Bigarray path to float list for serialization *)
+            let n = Bigarray.Array1.dim first_path / 2 in
+            let raw_path_list = List.init n (fun i -> Bigarray.Array1.get first_path (2 * i + 1)) in
+            Research_bridge.run_async state raw_path_list
+          );
+
           `Assoc [
             ("fisher_distance", `Float state.fisher_distance);
             ("curvature", `Float state.curvature);
-            ("exhaustion", `Float (Manifold_geometry.ManifoldGeometry.density_value state.exhaustion));
+            ("exhaustion", `Float (Manifold_geometry.density_value state.exhaustion));
             ("mu", `Float state.mu);
             ("sigma2", `Float state.sigma2);
             ("log_signature", `List (Array.to_list (Array.map (fun v -> `Float v) state.log_signature)))
@@ -84,11 +94,11 @@ module Server = struct
       in
 
       let symbol = !current_symbol in
-      let ticker_opt = Market_data.MarketData.fetch_real_data ~symbol () in
+      let ticker_opt = Market_data.fetch_real_data ~symbol () in
       let ticker = match ticker_opt with
         | Some t -> t
         | None -> { 
-            Market_data.MarketData.symbol; 
+            Market_data.symbol; 
             price = 100.0; 
             atm_vol = 0.30; 
             skew_25d = -0.04; 
@@ -114,10 +124,10 @@ module Server = struct
           ("fly", `Float ticker.fly_25d);
           ("rv_20d", `Float ticker.rv_20d);
           ("rv_60d", `Float ticker.rv_60d);
-          ("term_structure", `List (List.map (fun (p: Market_data.MarketData.term_point) -> 
+          ("term_structure", `List (List.map (fun (p: Market_data.term_point) -> 
             `Assoc [("days", `Int p.days); ("iv", `Float p.iv)]
           ) ticker.term_structure));
-          ("gex_profile", `List (List.map (fun (g: Market_data.MarketData.gex_point) ->
+          ("gex_profile", `List (List.map (fun (g: Market_data.gex_point) ->
             `Assoc [("strike", `Float g.strike); ("gex", `Float g.gex)]
           ) ticker.gex_profile));
           ("hurst_price", `Float ticker.hurst_price);
@@ -131,16 +141,20 @@ module Server = struct
       Lwt_unix.sleep 0.5 >>= stream_data
     in
 
-    (* Run listener and streamer concurrently *)
-    Lwt.catch (fun () ->
-      Lwt.pick [listen_loop (); stream_data ()]
-    ) (fun _ ->
-      Lwt_log.info_f ~section "Client %d disconnected" id
-    )
+  (* Run listener and streamer concurrently *)
+  Lwt.catch (fun () ->
+    Lwt.pick [listen_loop (); stream_data ()]
+  ) (fun _ ->
+    Lwt_log.info_f ~section "Client %d disconnected" id
+  )
 
-  let start port =
+let rec start port =
+  Lwt.catch (fun () ->
     Lwt_log.info_f ~section "Starting WebSocket server on port %d" port >>= fun () ->
     let mode = `TCP (`Port port) in
     establish_server ~mode handle_client
-
-end
+  ) (fun exn ->
+    Lwt_log.error_f ~section "Server crash: %s. Restarting in 1s..." (Printexc.to_string exn) >>= fun () ->
+    Lwt_unix.sleep 1.0 >>= fun () ->
+    start port
+  )

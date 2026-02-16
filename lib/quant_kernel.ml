@@ -9,4 +9,8 @@ module Stream_server = Stream_server
 module Slv_engine = Slv_engine
 module Neural_calibrate = Neural_calibrate
 module Market_data = Market_data
+module Manifold_geometry = Manifold_geometry
+module Manifold_calibration = Manifold_calibration
+module Heston = Heston
+module MathGuard = Math_guard
 

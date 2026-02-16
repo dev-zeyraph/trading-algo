@@ -1,0 +1,36 @@
+# OCaml
+_build/
+*.install
+*.cmi
+*.cmx
+*.cmo
+*.cmt
+*.cmti
+*.o
+*.a
+*.cmxa
+*.cmxs
+
+# Node / Frontend
+node_modules/
+dist/
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Project Specific
+benchmark_trace.json
+state.json
+*.png
+*.webp
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

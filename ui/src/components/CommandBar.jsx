@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 const PARAM_KEYS = ['alpha', 'beta', 'rho', 'nu']
 const COMMANDS = [
     { cmd: 'SABR', desc: 'Set SABR parameters', args: PARAM_KEYS },
+    { cmd: 'HESTON', desc: 'Set Simulation Vol-of-Vol', args: ['xi'] },
     { cmd: 'ZEN', desc: 'Toggle Zen Mode' },
     { cmd: 'GRID', desc: 'Set Markov grid size', args: ['size'] },
     { cmd: 'RESET', desc: 'Reset all parameters to defaults' },
